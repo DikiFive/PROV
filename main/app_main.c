@@ -71,6 +71,7 @@ static void event_handler(void *arg, esp_event_base_t event_base,
             ESP_LOGI(TAG, "接收到 Wi-Fi 凭据:\n\tSSID: %s\n\t密码: %s",
                      (const char *)wifi_sta_cfg->ssid,
                      (const char *)wifi_sta_cfg->password);
+            print_memory_usage("Wi-Fi Credentials Received");
             break;
         }
         case WIFI_PROV_CRED_FAIL:
@@ -79,16 +80,19 @@ static void event_handler(void *arg, esp_event_base_t event_base,
             wifi_prov_sta_fail_reason_t *reason = (wifi_prov_sta_fail_reason_t *)event_data;
             ESP_LOGE(TAG, "配网失败!\n\t原因: %s",
                      (*reason == WIFI_PROV_STA_AUTH_ERROR) ? "Wi-Fi 认证失败" : "未找到 Wi-Fi 接入点");
+            print_memory_usage("Wi-Fi Connection Failed");
             break;
         }
         case WIFI_PROV_CRED_SUCCESS:
             // 配网凭据验证成功
             ESP_LOGI(TAG, "配网成功");
+            print_memory_usage("Wi-Fi Connected Successfully");
             break;
         case WIFI_PROV_END:
             // 配网过程结束
-            vTaskDelay(pdMS_TO_TICKS(500)); // 增加延迟以确保蓝牙资源释放，避免资源冲突
-            wifi_prov_mgr_deinit();         // 去初始化配网管理器，释放相关资源
+            vTaskDelay(pdMS_TO_TICKS(500));               // 增加延迟以确保蓝牙资源释放，避免资源冲突
+            wifi_prov_mgr_deinit();                       // 去初始化配网管理器，释放相关资源
+            print_memory_usage("After Provisioning End"); // 监控配网结束后的内存使用情况
             break;
         default:
             break;
@@ -188,6 +192,9 @@ esp_err_t custom_prov_data_handler(uint32_t session_id, const uint8_t *inbuf, ss
  */
 void app_main(void)
 {
+    // 初始化前的 RAM 使用量
+    print_memory_usage("Before Initialization");
+
     // 初始化NVS（非易失性存储），用于存储Wi-Fi凭据等配置信息
     esp_err_t ret = nvs_flash_init();
     // 检查NVS初始化是否成功，如果NVS分区没有空闲页或版本不匹配，则擦除并重新初始化
@@ -224,6 +231,9 @@ void app_main(void)
     };
 
     ESP_ERROR_CHECK(wifi_prov_mgr_init(config)); // 初始化Wi-Fi配网管理器
+
+    // 初始化后的 RAM 使用量
+    print_memory_usage("After Initialization");
 
     bool provisioned = false;
     // 检查设备是否已经配网
